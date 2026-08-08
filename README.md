@@ -1,4 +1,4 @@
-# 同屏播放器
+# Same Screen Video Comparison Player（同屏播放器）
 
 一个 Windows 桌面程序，用于 2~3 个视频的同屏对比播放。纯本地运行，不联网、不处理音频。
 
