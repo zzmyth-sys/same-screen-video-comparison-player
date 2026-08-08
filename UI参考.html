@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同屏播放器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    /* 深色模式为默认 */
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #242424;
+    --bg-tertiary: #2e2e2e;
+    --text-primary: #f0f0f0;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #808080;
+    --text-quaternary: #555555;
+    --border: #333333;
+    --accent: #f0f0f0;
+    --danger: #e74c3c;
+    --video-bg: #0a0a0a;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+  html.light {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f7;
+    --bg-tertiary: #eaeaea;
+    --text-primary: #1a1a1a;
+    --text-secondary: #555555;
+    --text-tertiary: #888888;
+    --text-quaternary: #aaaaaa;
+    --border: #e0e0e0;
+    --accent: #1a1a1a;
+    --danger: #c0392b;
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ========== 启动页 ========== */
+  .launch-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 40px 24px;
+    gap: 32px;
+    animation: fadeIn 0.4s ease-out;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .launch-header { text-align: center; }
+  .launch-logo {
+    width: 64px; height: 64px;
+    margin: 0 auto 20px;
+    color: var(--text-primary);
+  }
+  .launch-title { font-size: 28px; font-weight: 500; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .launch-subtitle { font-size: 14px; color: var(--text-tertiary); }
+
+  .config-card {
+    width: 100%; max-width: 480px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .config-section { display: flex; flex-direction: column; gap: 12px; }
+  .config-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.3px; }
+  .radio-group { display: flex; gap: 10px; }
+  .radio-pill { flex: 1; position: relative; }
+  .radio-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .radio-pill label {
+    display: block; padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    text-align: center; font-size: 14px; cursor: pointer;
+    transition: all 0.15s ease-out;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    user-select: none;
+  }
+  .radio-pill input:checked + label {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    font-weight: 500;
+  }
+  .radio-pill label:hover { border-color: var(--text-quaternary); }
+
+  .hint-row {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text-tertiary);
+    padding: 12px 14px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+  }
+  .hint-icon { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.6; }
+
+  .btn-primary {
+    width: 100%; max-width: 480px;
+    padding: 14px 24px;
+    background: var(--accent);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 15px; font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:active { transform: scale(0.98); }
+
+  /* ========== 播放器页 ========== */
+  .player-page {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--video-bg);
+    animation: fadeIn 0.3s ease-out;
+  }
+  .player-page.active { display: flex; }
+
+  /* 顶部工具栏 */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: var(--bg-secondary);
+    gap: 12px; flex-shrink: 0;
+  }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 2px; }
+  .tool-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .tool-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+  .tool-btn.active { background: var(--bg-tertiary); color: var(--text-primary); }
+  .tool-btn svg { width: 16px; height: 16px; }
+  .tool-divider {
+    width: 1px; height: 20px;
+    background: var(--border);
+    margin: 0 6px;
+  }
+  .tool-btn.danger { color: var(--danger); }
+  .tool-btn.danger:hover { background: rgba(231, 76, 60, 0.1); }
+
+  /* 进度条 */
+  .timeline {
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 14px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .time-label {
+    font-size: 12px; color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    min-width: 110px; text-align: right;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+  .scrubber {
+    flex: 1; position: relative;
+    height: 20px; display: flex; align-items: center;
+    cursor: pointer;
+  }
+  .scrubber-track {
+    width: 100%; height: 4px;
+    background: var(--border);
+    border-radius: 2px; position: relative; overflow: hidden;
+  }
+  .scrubber-fill {
+    height: 100%; width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.05s linear;
+  }
+  .scrubber-thumb {
+    position: absolute; left: 0%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--bg-secondary);
+    opacity: 0; transition: opacity 0.15s, left 0.05s linear;
+    pointer-events: none;
+  }
+  .scrubber:hover .scrubber-thumb { opacity: 1; }
+  .scrubber.dragging .scrubber-thumb { opacity: 1; }
+
+  /* 视频区域 */
+  .video-stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--video-bg);
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .video-stage.horizontal { flex-direction: row; }
+  .video-cell {
+    flex: 1; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+    min-height: 0;
+  }
+  .video-stage.horizontal .video-cell {
+    border-bottom: none;
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+  .video-stage.horizontal .video-cell:last-child { border-right: none; }
+  .video-cell:last-child { border-bottom: none; }
+
+  .video-placeholder {
+    text-align: center;
+    color: var(--text-quaternary);
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .video-placeholder svg {
+    width: 44px; height: 44px;
+    margin-bottom: 10px;
+    opacity: 0.35;
+  }
+  .video-placeholder p { font-size: 13px; margin-bottom: 4px; }
+  .video-placeholder span { font-size: 12px; opacity: 0.6; }
+  .video-cell.has-video .video-placeholder { display: none; }
+
+  .video-label {
+    position: absolute; top: 10px; left: 10px;
+    padding: 3px 10px;
+    background: rgba(0,0,0,0.55);
+    color: rgba(255,255,255,0.75);
+    font-size: 11px;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    z-index: 5;
+  }
+  video {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* 划像对比 */
+  .wipe-handle {
+    position: absolute; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    cursor: ew-resize;
+    z-index: 10;
+    left: 50%;
+    display: none;
+  }
+  .wipe-handle.active { display: block; }
+  .wipe-handle::after {
+    content: '';
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .wipe-handle svg {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px; height: 14px;
+    color: var(--bg-primary);
+    z-index: 11;
+    pointer-events: none;
+  }
+  .wipe-clip {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .wipe-clip video {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+
+  /* 拖放高亮 */
+  .video-cell.drag-over {
+    background: rgba(255,255,255,0.04);
+    outline: 2px dashed rgba(255,255,255,0.15);
+    outline-offset: -4px;
+  }
+
+  /* 底部状态栏 */
+  .statusbar {
+    padding: 8px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--text-tertiary);
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+  }
+  .status-left { display: flex; gap: 16px; }
+  .status-item { display: flex; align-items: center; gap: 5px; }
+  .status-item svg { width: 14px; height: 14px; opacity: 0.5; }
+  .kbd {
+    padding: 1px 5px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .status-right { display: flex; align-items: center; gap: 6px; }
+
+  /* 隐藏文件输入 */
+  input[type="file"] { display: none; }
+
+  /* 3视频网格 */
+  .video-stage.grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .video-stage.grid-3 .video-cell:nth-child(1) {
+    grid-column: 1; grid-row: 1;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .video-stage.grid-3 .video-cell:nth-child(2) {
+    grid-column: 2; grid-row: 1;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .video-stage.grid-3 .video-cell:nth-child(3) {
+    grid-column: 1 / 3; grid-row: 2;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  /* 返回按钮 */
+  .back-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+    margin-right: 8px;
+  }
+  .back-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+  .back-btn svg { width: 16px; height: 16px; }
+
+  /* 主题切换按钮 */
+  .theme-toggle {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    transition: all 0.15s;
+  }
+  .theme-toggle:hover { background: var(--bg-tertiary); }
+  .theme-toggle svg { width: 18px; height: 18px; }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<!-- ========== 启动页 ========== -->
+<div class="launch-page" id="launchPage">
+  <div class="launch-header">
+    <svg class="launch-logo" viewBox="0 0 48 48" fill="none">
+      <rect x="5" y="5" width="38" height="38" rx="5" stroke="currentColor" stroke-width="2.5"/>
+      <line x1="24" y1="5" x2="24" y2="43" stroke="currentColor" stroke-width="2.5"/>
+      <polygon points="14,18 14,30 21,24" fill="currentColor"/>
+      <rect x="22" y="17" width="4" height="14" rx="1.5" fill="currentColor"/>
+      <rect x="22.5" y="18.5" width="3" height="11" rx="1" fill="var(--bg-primary)"/>
+    </svg>
+    <div class="launch-title">同屏播放器</div>
+    <div class="launch-subtitle">多视频同步对比 · 帧级精度 · 划像检视</div>
+  </div>
+
+  <div class="config-card">
+    <div class="config-section">
+      <div class="config-label">对比视频数量</div>
+      <div class="radio-group">
+        <div class="radio-pill">
+          <input type="radio" name="count" id="c2" value="2" checked>
+          <label for="c2">2 个视频</label>
+        </div>
+        <div class="radio-pill">
+          <input type="radio" name="count" id="c3" value="3">
+          <label for="c3">3 个视频</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-label">视频方向</div>
+      <div class="radio-group">
+        <div class="radio-pill">
+          <input type="radio" name="orient" id="landscape" value="landscape" checked>
+          <label for="landscape">横屏 → 上下排列</label>
+        </div>
+        <div class="radio-pill">
+          <input type="radio" name="orient" id="portrait" value="portrait">
+          <label for="portrait">竖屏 → 左右排列</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint-row">
+      <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+      </svg>
+      <span>进入后拖入视频文件，或双击窗口选择；2 视频模式支持划像对比。</span>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="startPlayer()">开始对比</button>
+</div>
+
+<!-- ========== 播放器页 ========== -->
+<div class="player-page" id="playerPage">
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button class="back-btn" onclick="backToLaunch()" title="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <button class="tool-btn active" id="playBtn" onclick="togglePlay()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <span id="playText">播放</span>
+      </button>
+      <button class="tool-btn" onclick="stepFrame(-1)" title="上一帧 (←)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        <span>上一帧</span>
+      </button>
+      <button class="tool-btn" onclick="stepFrame(1)" title="下一帧 (→)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        <span>下一帧</span>
+      </button>
+      <div class="tool-divider"></div>
+      <button class="tool-btn" onclick="resetZoom()" title="复位缩放">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
+        <span>复位</span>
+      </button>
+    </div>
+    <div class="toolbar-right">
+      <button class="tool-btn" id="layoutBtn" onclick="toggleLayout()" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18"/></svg>
+        <span id="layoutText">左右排列</span>
+      </button>
+      <button class="tool-btn" id="wipeBtn" onclick="toggleWipe()" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v16H4zM13 4h7v16h-7z"/></svg>
+        <span>划像对比</span>
+      </button>
+      <div class="tool-divider" id="rightDivider" style="display:none;"></div>
+      <button class="tool-btn danger" onclick="clearVideos()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        <span>清空</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="timeline">
+    <div class="scrubber" id="scrubber" onmousedown="startScrub(event)">
+      <div class="scrubber-track">
+        <div class="scrubber-fill" id="scrubberFill"></div>
+      </div>
+      <div class="scrubber-thumb" id="scrubberThumb"></div>
+    </div>
+    <div class="time-label" id="timeLabel">00:00:00 / 00:00:00</div>
+  </div>
+
+  <!-- 视频区域 -->
+  <div class="video-stage" id="videoStage">
+    <div class="video-cell" id="cell0" ondblclick="selectFile(0)" ondragover="allowDrop(event)" ondrop="handleDrop(event,0)" ondragleave="dragLeave(event)">
+      <div class="video-label">视频 1</div>
+      <div class="video-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M10 8l6 4-6 4V8z"/></svg>
+        <p>拖入文件 或 双击选择</p>
+        <span>支持 MP4 / MKV / MOV / WEBM</span>
+      </div>
+    </div>
+    <div class="video-cell" id="cell1" ondblclick="selectFile(1)" ondragover="allowDrop(event)" ondrop="handleDrop(event,1)" ondragleave="dragLeave(event)">
+      <div class="video-label">视频 2</div>
+      <div class="video-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M10 8l6 4-6 4V8z"/></svg>
+        <p>拖入文件 或 双击选择</p>
+        <span>支持 MP4 / MKV / MOV / WEBM</span>
+      </div>
+    </div>
+    <div class="video-cell" id="cell2" style="display:none;" ondblclick="selectFile(2)" ondragover="allowDrop(event)" ondrop="handleDrop(event,2)" ondragleave="dragLeave(event)">
+      <div class="video-label">视频 3</div>
+      <div class="video-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M10 8l6 4-6 4V8z"/></svg>
+        <p>拖入文件 或 双击选择</p>
+        <span>支持 MP4 / MKV / MOV / WEBM</span>
+      </div>
+    </div>
+    <!-- 划像遮罩层（仅2视频时） -->
+    <div class="wipe-clip" id="wipeClip" style="display:none;">
+      <video id="wipeVideo" muted></video>
+    </div>
+    <div class="wipe-handle" id="wipeHandle" onmousedown="startWipeDrag(event)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- 底部状态栏 -->
+  <div class="statusbar">
+    <div class="status-left">
+      <div class="status-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>拖入下方加载</span>
+      </div>
+      <div class="status-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span>双击窗口选择</span>
+      </div>
+    </div>
+    <div class="status-right">
+      <span class="kbd">Space</span> <span>播放</span>
+      <span style="opacity:0.4;margin:0 4px;">·</span>
+      <span class="kbd">←</span> <span>逐帧</span>
+      <span style="opacity:0.4;margin:0 4px;">·</span>
+      <span class="kbd">滚轮</span> <span>缩放</span>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏的文件输入 -->
+<input type="file" id="fileInput" accept="video/*" onchange="handleFileSelect(event)">
+
+<!-- 主题切换 -->
+<button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
+  <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+  </svg>
+</button>
+
+<script>
+// ========== 状态 ==========
+let videoCount = 2;
+let orientation = 'landscape';
+let isPlaying = false;
+let isHorizontal = false;
+let isWipe = false;
+let currentFileIndex = -1;
+let videos = [null, null, null];
+let scrubbing = false;
+let wipeDragging = false;
+
+// ========== 主题切换 ==========
+function toggleTheme() {
+  document.documentElement.classList.toggle('light');
+  const isLight = document.documentElement.classList.contains('light');
+  document.getElementById('themeIcon').innerHTML = isLight
+    ? '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
+    : '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+}
+
+// ========== 启动页 ==========
+function startPlayer() {
+  videoCount = parseInt(document.querySelector('input[name="count"]:checked').value);
+  orientation = document.querySelector('input[name="orient"]:checked').value;
+
+  document.getElementById('launchPage').style.display = 'none';
+  document.getElementById('playerPage').classList.add('active');
+
+  setupPlayer();
+}
+
+function backToLaunch() {
+  pauseAll();
+  document.getElementById('playerPage').classList.remove('active');
+  document.getElementById('launchPage').style.display = 'flex';
+}
+
+function setupPlayer() {
+  const stage = document.getElementById('videoStage');
+  const cell2 = document.getElementById('cell2');
+  const layoutBtn = document.getElementById('layoutBtn');
+  const wipeBtn = document.getElementById('wipeBtn');
+  const rightDivider = document.getElementById('rightDivider');
+
+  // 重置
+  stage.classList.remove('horizontal', 'grid-3');
+  isHorizontal = false;
+  isWipe = false;
+  document.getElementById('wipeHandle').classList.remove('active');
+  document.getElementById('wipeClip').style.display = 'none';
+  document.getElementById('layoutText').textContent = '左右排列';
+  layoutBtn.classList.remove('active');
+  wipeBtn.classList.remove('active');
+
+  if (videoCount === 3) {
+    cell2.style.display = 'flex';
+    stage.classList.add('grid-3');
+    layoutBtn.style.display = 'none';
+    wipeBtn.style.display = 'none';
+    rightDivider.style.display = 'none';
+  } else {
+    cell2.style.display = 'none';
+    if (orientation === 'portrait') {
+      stage.classList.add('horizontal');
+      isHorizontal = true;
+      document.getElementById('layoutText').textContent = '上下排列';
+    }
+    layoutBtn.style.display = 'flex';
+    wipeBtn.style.display = 'flex';
+    rightDivider.style.display = 'block';
+  }
+}
+
+// ========== 文件加载 ==========
+function selectFile(index) {
+  currentFileIndex = index;
+  document.getElementById('fileInput').click();
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file && currentFileIndex >= 0) {
+    loadVideo(currentFileIndex, file);
+  }
+  e.target.value = '';
+}
+
+function handleDrop(e, index) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    loadVideo(index, files[0]);
+  }
+}
+
+function allowDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function loadVideo(index, file) {
+  const cell = document.getElementById('cell' + index);
+  const url = URL.createObjectURL(file);
+
+  // 移除旧的
+  const old = cell.querySelector('video');
+  if (old) { old.pause(); old.remove(); URL.revokeObjectURL(old.src); }
+
+  const video = document.createElement('video');
+  video.src = url;
+  video.controls = false;
+  video.style.width = '100%';
+  video.style.height = '100%';
+  video.style.objectFit = 'contain';
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+
+  video.addEventListener('loadedmetadata', () => {
+    updateTimeLabel();
+  });
+  video.addEventListener('timeupdate', () => {
+    if (!scrubbing && videos[index] === video) {
+      updateScrubber();
+    }
+  });
+  video.addEventListener('ended', () => {
+    if (allEnded()) { isPlaying = false; updatePlayBtn(); }
+  });
+
+  cell.appendChild(video);
+  cell.classList.add('has-video');
+  videos[index] = video;
+
+  // 同步更新划像层
+  if (index === 1 && videoCount === 2) {
+    const wipeVideo = document.getElementById('wipeVideo');
+    wipeVideo.src = url;
+    wipeVideo.muted = true;
+    wipeVideo.playsInline = true;
+    wipeVideo.preload = 'metadata';
+  }
+
+  updateTimeLabel();
+}
+
+// ========== 播放控制 ==========
+function togglePlay() {
+  if (!hasAnyVideo()) return;
+  isPlaying = !isPlaying;
+  updatePlayBtn();
+  videos.forEach((v, i) => {
+    if (v) {
+      if (isPlaying) {
+        v.play().catch(() => {});
+        if (i === 1 && videoCount === 2) {
+          document.getElementById('wipeVideo').play().catch(() => {});
+        }
+      } else {
+        v.pause();
+        if (i === 1 && videoCount === 2) {
+          document.getElementById('wipeVideo').pause();
+        }
+      }
+    }
+  });
+}
+
+function updatePlayBtn() {
+  const btn = document.getElementById('playBtn');
+  const text = document.getElementById('playText');
+  const icon = isPlaying
+    ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  btn.innerHTML = icon;
+  btn.appendChild(text);
+  text.textContent = isPlaying ? '暂停' : '播放';
+  btn.classList.toggle('active', isPlaying);
+}
+
+function pauseAll() {
+  isPlaying = false;
+  updatePlayBtn();
+  videos.forEach(v => v && v.pause());
+  document.getElementById('wipeVideo').pause();
+}
+
+function stepFrame(dir) {
+  videos.forEach(v => {
+    if (v) {
+      v.pause();
+      v.currentTime = Math.max(0, v.currentTime + dir * (1 / 30));
+    }
+  });
+  const wipeVideo = document.getElementById('wipeVideo');
+  if (wipeVideo.src) wipeVideo.currentTime = Math.max(0, wipeVideo.currentTime + dir * (1 / 30));
+  isPlaying = false;
+  updatePlayBtn();
+  updateScrubber();
+  updateTimeLabel();
+}
+
+function hasAnyVideo() {
+  return videos.some(v => v !== null);
+}
+
+function allEnded() {
+  return videos.filter(v => v).every(v => v.ended);
+}
+
+// ========== 进度条 ==========
+function updateScrubber() {
+  const v = videos.find(v => v);
+  if (!v || !v.duration) return;
+  const pct = (v.currentTime / v.duration) * 100;
+  document.getElementById('scrubberFill').style.width = pct + '%';
+  document.getElementById('scrubberThumb').style.left = pct + '%';
+}
+
+function updateTimeLabel() {
+  const v = videos.find(v => v);
+  if (!v) {
+    document.getElementById('timeLabel').textContent = '00:00:00 / 00:00:00';
+    return;
+  }
+  const cur = formatTime(v.currentTime || 0);
+  const dur = formatTime(v.duration || 0);
+  document.getElementById('timeLabel').textContent = cur + ' / ' + dur;
+}
+
+function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+}
+
+function startScrub(e) {
+  if (!hasAnyVideo()) return;
+  scrubbing = true;
+  document.getElementById('scrubber').classList.add('dragging');
+  doScrub(e);
+  document.addEventListener('mousemove', doScrub);
+  document.addEventListener('mouseup', endScrub);
+}
+
+function doScrub(e) {
+  if (!scrubbing) return;
+  const rect = document.getElementById('scrubber').getBoundingClientRect();
+  const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+  document.getElementById('scrubberFill').style.width = pct + '%';
+  document.getElementById('scrubberThumb').style.left = pct + '%';
+  const v = videos.find(v => v);
+  if (v && v.duration) {
+    const t = (pct / 100) * v.duration;
+    videos.forEach(v => { if (v) v.currentTime = t; });
+    const wipeVideo = document.getElementById('wipeVideo');
+    if (wipeVideo.src) wipeVideo.currentTime = t;
+    updateTimeLabel();
+  }
+}
+
+function endScrub() {
+  scrubbing = false;
+  document.getElementById('scrubber').classList.remove('dragging');
+  document.removeEventListener('mousemove', doScrub);
+  document.removeEventListener('mouseup', endScrub);
+}
+
+// ========== 布局切换 ==========
+function toggleLayout() {
+  if (videoCount !== 2) return;
+  isHorizontal = !isHorizontal;
+  const stage = document.getElementById('videoStage');
+  const btn = document.getElementById('layoutBtn');
+  const txt = document.getElementById('layoutText');
+  stage.classList.toggle('horizontal', isHorizontal);
+  txt.textContent = isHorizontal ? '上下排列' : '左右排列';
+  btn.classList.toggle('active', isHorizontal);
+}
+
+// ========== 划像对比 ==========
+function toggleWipe() {
+  if (videoCount !== 2 || !videos[1]) return;
+  isWipe = !isWipe;
+  const handle = document.getElementById('wipeHandle');
+  const clip = document.getElementById('wipeClip');
+  const btn = document.getElementById('wipeBtn');
+
+  handle.classList.toggle('active', isWipe);
+  clip.style.display = isWipe ? 'block' : 'none';
+  btn.classList.toggle('active', isWipe);
+
+  if (isWipe && videos[1]) {
+    const wipeVideo = document.getElementById('wipeVideo');
+    wipeVideo.src = videos[1].src;
+    wipeVideo.currentTime = videos[1].currentTime;
+    if (isPlaying) wipeVideo.play().catch(() => {});
+  }
+}
+
+function startWipeDrag(e) {
+  if (!isWipe) return;
+  wipeDragging = true;
+  document.addEventListener('mousemove', doWipeDrag);
+  document.addEventListener('mouseup', endWipeDrag);
+}
+
+function doWipeDrag(e) {
+  if (!wipeDragging) return;
+  const stage = document.getElementById('videoStage');
+  const rect = stage.getBoundingClientRect();
+  const pct = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
+  document.getElementById('wipeHandle').style.left = pct + '%';
+  document.getElementById('wipeClip').style.width = pct + '%';
+}
+
+function endWipeDrag() {
+  wipeDragging = false;
+  document.removeEventListener('mousemove', doWipeDrag);
+  document.removeEventListener('mouseup', endWipeDrag);
+}
+
+// ========== 缩放 & 清空 ==========
+function resetZoom() {
+  videos.forEach(v => { if (v) v.currentTime = 0; });
+  const wipeVideo = document.getElementById('wipeVideo');
+  if (wipeVideo.src) wipeVideo.currentTime = 0;
+  updateScrubber();
+  updateTimeLabel();
+}
+
+function clearVideos() {
+  pauseAll();
+  [0, 1, 2].forEach(i => {
+    const cell = document.getElementById('cell' + i);
+    const v = cell.querySelector('video');
+    if (v) { v.pause(); v.remove(); URL.revokeObjectURL(v.src); }
+    cell.classList.remove('has-video');
+    videos[i] = null;
+  });
+  const wipeVideo = document.getElementById('wipeVideo');
+  wipeVideo.pause(); wipeVideo.src = '';
+  document.getElementById('scrubberFill').style.width = '0%';
+  document.getElementById('scrubberThumb').style.left = '0%';
+  updateTimeLabel();
+  if (isWipe) toggleWipe();
+}
+
+// ========== 键盘快捷键 ==========
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('launchPage').style.display !== 'none') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowLeft') { e.preventDefault(); stepFrame(-1); }
+  if (e.code === 'ArrowRight') { e.preventDefault(); stepFrame(1); }
+});
+
+// ========== 滚轮缩放（简化：控制音量） ==========
+document.getElementById('videoStage').addEventListener('wheel', (e) => {
+  if (document.getElementById('launchPage').style.display !== 'none') return;
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  videos.forEach(v => {
+    if (v) v.volume = Math.max(0, Math.min(1, (v.volume || 1) + delta));
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+test_videos/
+shot_*.png
+shot/
+新建文本文档.txt
+软件截图/
