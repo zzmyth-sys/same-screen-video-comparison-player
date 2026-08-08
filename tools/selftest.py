@@ -144,7 +144,35 @@ def test_gui():
     assert_panes_fill(win3, "3v竖屏")
     win3.grab().save(os.path.join(SHOT_DIR, "3v_portrait.png"))
     win3.close()
-    print("[OK] 界面：2/3 视频、横竖布局、缩放、划像滚轮缩放均正常")
+
+    # 多文件拖入：一次拖 2 个文件自动填入两个窗口，已满则从第一个替换
+    winm = PlayerWindow(2, True)
+    winm.show()
+    app.processEvents()
+    winm._on_videos_dropped(0, [v1, v2])
+    assert winm.readers[0] is not None and winm.readers[1] is not None, "多文件拖入未填满窗口"
+    assert winm.readers[0].path == v1 and winm.readers[1].path == v2, "多文件顺序不对"
+    winm._on_videos_dropped(0, [v3, v1])
+    assert winm.readers[0].path == v3 and winm.readers[1].path == v1, "已满时未从第一个替换"
+    winm._on_videos_dropped(0, [v1, v2, v3])  # 3 个文件只取前 2 个
+    assert winm.readers[0].path == v1 and winm.readers[1].path == v2, "超出窗口数的文件未截断"
+    # 空位优先：3 视频只装了第 3 个，再拖 2 个应填到前两个空位
+    win3 = PlayerWindow(3, True)
+    win3.show()
+    app.processEvents()
+    win3._load_video(2, v3)
+    win3._on_videos_dropped(0, [v1, v2])
+    assert win3.readers[0].path == v1 and win3.readers[1].path == v2, "空位未优先填充"
+    win3.close()
+    # 划像模式多文件拖入
+    winw = PlayerWindow(2, True)
+    winw.show()
+    app.processEvents()
+    winw._toggle_wipe()
+    winw._on_wipe_videos_dropped([v1, v2])
+    assert winw.readers[0].path == v1 and winw.readers[1].path == v2, "划像多文件拖入失败"
+    winw.close()
+    print("[OK] 界面：2/3 视频、横竖布局、缩放、划像、多文件拖入均正常")
 
 
 def main():

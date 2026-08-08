@@ -11,6 +11,7 @@ from .video_reader import is_video_file
 
 class VideoPane(QWidget):
     video_dropped = Signal(str)
+    videos_dropped = Signal(list)        # 一次拖入多个文件
     wheel_zoom = Signal(dict)        # {"factor": float, "fx": float, "fy": float}
     pan_delta = Signal(float, float) # 归一化平移量
     reset_zoom_requested = Signal()
@@ -275,11 +276,16 @@ class VideoPane(QWidget):
     def dropEvent(self, event):
         self._drag_over = False
         self.update()
+        paths = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if is_video_file(path):
-                self.video_dropped.emit(path)
-                break
+                paths.append(path)
+        if paths:
+            if len(paths) == 1:
+                self.video_dropped.emit(paths[0])
+            else:
+                self.videos_dropped.emit(paths)
         event.acceptProposedAction()
 
     @staticmethod

@@ -11,6 +11,7 @@ from .video_reader import is_video_file
 
 class WipePane(QWidget):
     dropped_file = Signal(str)
+    videos_dropped = Signal(list)          # 一次拖入多个文件
     clicked = Signal()
     wheel_zoom = Signal(dict)          # {"factor": float, "fx": float, "fy": float}
     reset_zoom_requested = Signal()
@@ -229,9 +230,14 @@ class WipePane(QWidget):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        paths = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if is_video_file(path):
-                self.dropped_file.emit(path)
-                break
+                paths.append(path)
+        if paths:
+            if len(paths) == 1:
+                self.dropped_file.emit(paths[0])
+            else:
+                self.videos_dropped.emit(paths)
         event.acceptProposedAction()

@@ -254,12 +254,14 @@ class PlayerWindow(QMainWindow):
     def _connect(self):
         for i, pane in enumerate(self.panes):
             pane.video_dropped.connect(lambda p, idx=i: self._load_video(idx, p))
+            pane.videos_dropped.connect(lambda paths, idx=i: self._on_videos_dropped(idx, paths))
             pane.wheel_zoom.connect(self._on_wheel_zoom)
             pane.pan_delta.connect(self._on_pan_delta)
             pane.reset_zoom_requested.connect(self._reset_zoom)
             pane.clicked.connect(self._toggle_play)
         self.wipe_pane.clicked.connect(self._toggle_play)
         self.wipe_pane.dropped_file.connect(self._on_wipe_drop)
+        self.wipe_pane.videos_dropped.connect(self._on_wipe_videos_dropped)
         self.wipe_pane.wheel_zoom.connect(self._on_wheel_zoom)
         self.wipe_pane.reset_zoom_requested.connect(self._reset_zoom)
 
@@ -313,6 +315,35 @@ class PlayerWindow(QMainWindow):
             self._load_video(0, path)
         else:
             self._load_video(1, path)
+
+    def _on_videos_dropped(self, index: int, paths: list):
+        """一次拖入多个文件：单个文件仍按目标窗口加载，多个文件自动依次填入。"""
+        paths = [p for p in paths if os.path.isfile(p)][:self.num_videos]
+        if not paths:
+            return
+        if len(paths) == 1:
+            self._load_video(index, paths[0])
+            return
+        self._assign_videos(paths)
+
+    def _on_wipe_videos_dropped(self, paths: list):
+        paths = [p for p in paths if os.path.isfile(p)][:2]
+        if not paths:
+            return
+        if len(paths) == 1:
+            self._on_wipe_drop(paths[0])
+            return
+        self._assign_videos(paths)
+
+    def _assign_videos(self, paths: list):
+        """先把文件填入空窗口，没有空位则从第一个窗口开始替换。"""
+        targets = [i for i, r in enumerate(self.readers) if r is None]
+        order = targets + [i for i in range(self.num_videos) if i not in targets]
+        count = 0
+        for i, path in zip(order, paths):
+            self._load_video(i, path)
+            count += 1
+        self.statusBar().showMessage(f"已加载 {count} 个视频", 4000)
 
     # ---------- 播放控制 ----------
 
