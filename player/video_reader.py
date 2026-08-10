@@ -8,6 +8,7 @@ import cv2
 VIDEO_EXTS = {
     ".mp4", ".mov", ".avi", ".mkv", ".flv", ".wmv", ".ts", ".m2ts",
     ".mts", ".webm", ".m4v", ".3gp", ".mpg", ".mpeg", ".rmvb", ".vob",
+    ".h265", ".hevc", ".265", ".h264", ".264",
 }
 
 
@@ -29,7 +30,9 @@ class VideoReader:
         if not self.cap.isOpened():
             raise ValueError(f"无法打开视频文件：{self.path}")
         self.fps = float(self.cap.get(cv2.CAP_PROP_FPS)) or 25.0
-        self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+        n = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # 裸流（.h265/.hevc 等）无容器索引时可能返回异常值，视为 0
+        self.frame_count = n if 0 <= n < 2 ** 31 else 0
         self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 0
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 0
         self.current = -1  # 当前显示的帧索引（0 起）

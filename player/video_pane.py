@@ -139,7 +139,7 @@ class VideoPane(QWidget):
         p.setPen(QColor("#4f4f4f"))
         p.drawText(QRectF(0, y0 + icon_h + 12 + 24, w, 18),
                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
-                   "支持 MP4 / MKV / MOV / WEBM")
+                   "支持 MP4 / MKV / MOV / WEBM / H.265")
 
     def _draw_overlay(self, p: QPainter):
         if self._filename:
@@ -228,7 +228,8 @@ class VideoPane(QWidget):
             self,
             f"选择视频 {self.index + 1}",
             "",
-            "视频文件 (*.mp4 *.mov *.avi *.mkv *.flv *.wmv *.ts *.webm *.m4v)",
+            "视频文件 (*.mp4 *.mov *.avi *.mkv *.flv *.wmv *.ts *.webm *.m4v "
+            "*.h265 *.hevc *.265 *.h264 *.264)",
         )
         if path:
             self.video_dropped.emit(path)

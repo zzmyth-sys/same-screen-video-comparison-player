@@ -8,7 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from player.video_reader import VideoReader  # noqa: E402
+from player.video_reader import VideoReader, is_video_file  # noqa: E402
 
 TEST_DIR = os.path.join(ROOT, "test_videos")
 SHOT_DIR = os.path.join(ROOT, "shot")
@@ -32,6 +32,25 @@ def test_reader():
     assert r.current == 0
     r.release()
     print("[OK] 视频引擎：打开 / 精确跳帧 / 逐帧 / 相对定位")
+
+
+def test_hevc():
+    hevc = os.path.join(TEST_DIR, "test_hevc.mp4")
+    if not os.path.exists(hevc):
+        print("[SKIP] H.265 测试文件不存在（需 ffmpeg 生成），跳过")
+        return
+    assert is_video_file(os.path.join(TEST_DIR, "test_hevc.hevc")), "未识别 .hevc 扩展名"
+    assert is_video_file(os.path.join(TEST_DIR, "test_hevc.h265")), "未识别 .h265 扩展名"
+    r = VideoReader(hevc)
+    assert r.frame_count == 90, f"H.265 帧数错误: {r.frame_count}"
+    f = r.read_index(30)
+    assert f is not None, "H.265 取帧失败"
+    r.release()
+    raw = VideoReader(os.path.join(TEST_DIR, "test_hevc.h265"))
+    assert raw.frame_count == 0, "裸流帧数应视为 0"
+    assert raw.frame_bgr() is not None or raw.read_index(0) is not None, "裸流无法读取首帧"
+    raw.release()
+    print("[OK] H.265 / HEVC 识别与解码正常")
 
 
 def assert_panes_fill(win, tag):
@@ -177,6 +196,7 @@ def test_gui():
 
 def main():
     test_reader()
+    test_hevc()
     test_gui()
     print("全部自测通过。截图目录:", SHOT_DIR)
 
