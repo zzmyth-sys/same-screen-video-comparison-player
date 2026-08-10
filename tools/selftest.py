@@ -73,6 +73,8 @@ def assert_panes_fill(win, tag):
 def test_gui():
     os.makedirs(SHOT_DIR, exist_ok=True)
     from PySide6.QtWidgets import QApplication  # noqa: E402
+    from PySide6.QtCore import QPoint, Qt  # noqa: E402
+    from PySide6.QtTest import QTest  # noqa: E402
     from player.player_window import PlayerWindow  # noqa: E402
 
     app = QApplication(sys.argv)
@@ -98,6 +100,17 @@ def test_gui():
     app.processEvents()
     assert abs(win.readers[0].current - 150) <= 3, \
         f"拖进度条后帧号不对: {win.readers[0].current}"
+    # 单击进度条 75% 位置：直接跳转到对应时间点
+    QTest.mouseClick(win.slider, Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier,
+                     QPoint(int(win.slider.width() * 0.75), win.slider.height() // 2))
+    deadline = time.time() + 8
+    while win.readers[0].seek_in_flight() and time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.02)
+    app.processEvents()
+    assert abs(win.readers[0].current - 225) <= 3, \
+        f"单击进度条后帧号不对: {win.readers[0].current}"
     # 单击画面切换播放/暂停
     win._set_playing(False)
     win.panes[0].clicked.emit()

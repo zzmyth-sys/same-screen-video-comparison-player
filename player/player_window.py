@@ -32,6 +32,37 @@ def _fmt(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+class SeekSlider(QSlider):
+    """支持单击任意位置直接跳转的进度条；按住拖动行为不变。"""
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.sliderPressed.emit()
+            self._seek_to_pos(event.position().x())
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            self._seek_to_pos(event.position().x())
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.sliderReleased.emit()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def _seek_to_pos(self, x: float):
+        ratio = max(0.0, min(1.0, x / max(1, self.width())))
+        value = round(self.minimum() + ratio * (self.maximum() - self.minimum()))
+        self.setValue(value)
+
+
 class PlayerWindow(QMainWindow):
     closed = Signal()
 
@@ -160,9 +191,9 @@ class PlayerWindow(QMainWindow):
         tl = QHBoxLayout(timeline)
         tl.setContentsMargins(16, 10, 16, 10)
         tl.setSpacing(14)
-        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider = SeekSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 10000)
-        self.slider.setToolTip("拖动进度条，所有视频同步跳转")
+        self.slider.setToolTip("拖动或单击进度条，所有视频同步跳转")
         tl.addWidget(self.slider, 1)
         self.time_label = QLabel("00:00:00 / 00:00:00")
         self.time_label.setObjectName("timeLabel")
