@@ -135,6 +135,12 @@ def test_gui():
     win._toggle_wipe()
     app.processEvents()
     win.grab().save(os.path.join(SHOT_DIR, "2v_wipe.png"))
+    assert win.wipe_pane._name_a == "video1.mp4", "划像左侧未显示文件名"
+    assert win.wipe_pane._name_b == "video2.mp4", "划像右侧未显示文件名"
+    win._toggle_wipe_dir()  # 横划像：上下各一个文件名角标
+    app.processEvents()
+    win.grab().save(os.path.join(SHOT_DIR, "2v_wipe_horizontal.png"))
+    win._toggle_wipe_dir()  # 改回竖划像
     # 划像模式滚轮缩放：划像窗格与并列窗格同步，双击复位
     win.wipe_pane.wheel_zoom.emit({"factor": 1.5, "fx": 0.42, "fy": 0.48})
     app.processEvents()

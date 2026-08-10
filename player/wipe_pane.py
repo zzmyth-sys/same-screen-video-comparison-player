@@ -2,7 +2,7 @@
 
 import cv2
 from PySide6.QtCore import QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPen
+from PySide6.QtGui import QColor, QFontMetrics, QImage, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 from .icons import make_icon
@@ -27,6 +27,8 @@ class WipePane(QWidget):
         self._press_pos = None
         self._a_src = None
         self._b_src = None
+        self._name_a = ""
+        self._name_b = ""
         self._src_w = 0
         self._src_h = 0
         self._zoom = 1.0
@@ -35,11 +37,14 @@ class WipePane(QWidget):
         self._ph_icon = make_icon("film", "#555555", 44).pixmap(44, 44)
         self.setCursor(Qt.CursorShape.SizeHorCursor)
 
-    def set_frames(self, a, b):
-        if a is self._a_src and b is self._b_src:
+    def set_frames(self, a, b, name_a: str = "", name_b: str = ""):
+        if (a is self._a_src and b is self._b_src
+                and name_a == self._name_a and name_b == self._name_b):
             return  # 帧没变，跳过重建
         self._a_src = a
         self._b_src = b
+        self._name_a = name_a
+        self._name_b = name_b
         if a is not None:
             self._src_h, self._src_w = a.shape[:2]
         elif b is not None:
@@ -112,7 +117,43 @@ class WipePane(QWidget):
             self._draw_cover(p, self._b, w, h)
             p.restore()
         self._draw_handle(p)
+        self._draw_labels(p)
         self._draw_border(p)
+
+    def _draw_labels(self, p: QPainter):
+        """两侧文件名角标：竖划像左右各一个，横划像上下各一个。"""
+        w, h = self.width(), self.height()
+        margin = 10
+        if self.vertical:
+            if self._name_a:
+                self._draw_chip(p, self._name_a, margin, margin)
+            if self._name_b:
+                self._draw_chip(p, self._name_b, w - margin, margin, right=True)
+        else:
+            if self._name_a:
+                self._draw_chip(p, self._name_a, margin, margin)
+            if self._name_b:
+                self._draw_chip(p, self._name_b, margin, h - margin, bottom=True)
+
+    def _draw_chip(self, p: QPainter, text: str, x: float, y: float,
+                   right: bool = False, bottom: bool = False):
+        font = p.font()
+        font.setPointSize(11)
+        p.setFont(font)
+        fm = QFontMetrics(font)
+        tw = fm.horizontalAdvance(text)
+        th = fm.height()
+        pad_x, pad_y = 10, 3
+        bw, bh = tw + pad_x * 2, th + pad_y * 2
+        if right:
+            x -= bw
+        if bottom:
+            y -= bh
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(0, 0, 0, 140))
+        p.drawRoundedRect(QRectF(x, y, bw, bh), 4, 4)
+        p.setPen(QColor(255, 255, 255, 191))
+        p.drawText(QRectF(x, y, bw, bh), Qt.AlignmentFlag.AlignCenter, text)
 
     def _draw_placeholder(self, p: QPainter):
         w, h = self.width(), self.height()

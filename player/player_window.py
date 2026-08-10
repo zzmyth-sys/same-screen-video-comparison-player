@@ -649,7 +649,11 @@ class PlayerWindow(QMainWindow):
             else:
                 pane.set_frame(-1, None, 0, "")
         if self.wipe_mode and self.num_videos >= 2:
-            self.wipe_pane.set_frames(self.frames[0], self.frames[1])
+            self.wipe_pane.set_frames(
+                self.frames[0], self.frames[1],
+                os.path.basename(self.readers[0].path) if self.readers[0] else "",
+                os.path.basename(self.readers[1].path) if self.readers[1] else "",
+            )
 
     def _center_window(self):
         scr = self.screen().availableGeometry()
