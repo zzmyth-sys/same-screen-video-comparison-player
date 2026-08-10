@@ -48,6 +48,7 @@ class PlayerWindow(QMainWindow):
         self.center = (0.5, 0.5)
         self.wipe_mode = False
         self.wipe_vertical = True
+        self.loop_mode = False
         self._centered_once = False
         self._was_playing = False
 
@@ -119,6 +120,13 @@ class PlayerWindow(QMainWindow):
         self.btn_zoom.setIconSize(QSize(16, 16))
         self.btn_zoom.setToolTip("复位缩放 (R)")
         tb.addWidget(self.btn_zoom)
+
+        self.btn_loop = QPushButton(make_icon("loop"), "循环")
+        self.btn_loop.setObjectName("toolButton")
+        self.btn_loop.setIconSize(QSize(16, 16))
+        self.btn_loop.setCheckable(True)
+        self.btn_loop.setToolTip("循环播放：播完自动从头开始")
+        tb.addWidget(self.btn_loop)
 
         tb.addStretch(1)
 
@@ -269,6 +277,7 @@ class PlayerWindow(QMainWindow):
         self.btn_prev.clicked.connect(lambda: self._step_frame(-1))
         self.btn_next.clicked.connect(lambda: self._step_frame(1))
         self.btn_zoom.clicked.connect(self._reset_zoom)
+        self.btn_loop.toggled.connect(self._on_loop_toggled)
         self.btn_layout.clicked.connect(self._toggle_layout)
         self.btn_wipe.clicked.connect(self._toggle_wipe)
         self.btn_wipe_dir.clicked.connect(self._toggle_wipe_dir)
@@ -355,6 +364,14 @@ class PlayerWindow(QMainWindow):
     def _set_playing(self, on: bool):
         self.playing = bool(on)
         if self.playing:
+            master = self.readers[0]
+            at_end = master is not None and (
+                master.at_end
+                or (master.frame_count and master.current >= master.frame_count - 1)
+            )
+            if at_end:
+                # 播完后再点播放：自动从头开始
+                self._restart_all()
             self.accum = [0.0] * self.num_videos
             interval = max(16, min(100, int(1000.0 / self.tick_fps)))
             self.timer.start(interval)
@@ -390,9 +407,29 @@ class PlayerWindow(QMainWindow):
         if ended or master.at_end or (
             master.frame_count and master.current >= master.frame_count - 1
         ):
+            if self.loop_mode:
+                self._restart_all()
+                self.accum = [0.0] * self.num_videos
+                self._refresh_panes()
+                self._update_slider()
+                return
             self._set_playing(False)
         self._refresh_panes()
         self._update_slider()
+
+    def _restart_all(self):
+        """所有视频回到第 0 帧（同步读取，保证帧号精确）。"""
+        for i, r in enumerate(self.readers):
+            if r is not None:
+                r.seek_relative(0.0)
+                self.frames[i] = r.frame_bgr()
+
+    def _on_loop_toggled(self, checked: bool):
+        self.loop_mode = checked
+        self.statusBar().showMessage(
+            "循环播放：开启，播完自动从头开始" if checked else "循环播放：关闭",
+            2500,
+        )
 
     def _step_frame(self, delta: int):
         self._pending_resume = False

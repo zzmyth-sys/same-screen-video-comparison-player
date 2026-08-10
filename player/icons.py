@@ -30,6 +30,14 @@ _ICONS = {
         '<circle cx="11" cy="11" r="8"/>'
         '<path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>'
     ),
+    "loop": (
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<polyline points="17 1 21 5 17 9"/>'
+        '<path d="M3 11V9a4 4 0 0 1 4-4h14"/>'
+        '<polyline points="7 23 3 19 7 15"/>'
+        '<path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>'
+    ),
     "layout": (
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
         'stroke-width="2">'

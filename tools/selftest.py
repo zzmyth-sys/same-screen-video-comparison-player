@@ -191,7 +191,28 @@ def test_gui():
     winw._on_wipe_videos_dropped([v1, v2])
     assert winw.readers[0].path == v1 and winw.readers[1].path == v2, "划像多文件拖入失败"
     winw.close()
-    print("[OK] 界面：2/3 视频、横竖布局、缩放、划像、多文件拖入均正常")
+
+    # 播放结束后再点播放：自动从头开始
+    winlp = PlayerWindow(2, True)
+    winlp.show()
+    app.processEvents()
+    winlp._load_video(0, v1)
+    winlp._load_video(1, v2)
+    winlp.readers[0].seek_relative(1.0)
+    winlp.frames[0] = winlp.readers[0].frame_bgr()
+    winlp._set_playing(True)
+    assert winlp.readers[0].current == 0, "结束后再播放未从头开始"
+    # 循环模式：播到结尾自动回卷且继续播放
+    winlp.loop_mode = True
+    winlp._set_playing(True)
+    winlp.readers[0].seek_relative(1.0)  # 模拟播放到最后
+    winlp.frames[0] = winlp.readers[0].frame_bgr()
+    winlp._tick()
+    assert winlp.readers[0].current == 0, "循环模式未回卷到开头"
+    assert winlp.playing, "循环模式回卷后应继续播放"
+    winlp._set_playing(False)
+    winlp.close()
+    print("[OK] 界面：2/3 视频、横竖布局、缩放、划像、多文件拖入、循环播放均正常")
 
 
 def main():
